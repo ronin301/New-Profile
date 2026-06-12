@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Staff Dashboard — KING BUSINESS ANALYTICS</title>
+  <link rel="stylesheet" href="../../css/main.css" />
+</head>
+<body>
+  <div class="app-shell" id="app-shell"></div>
+  <script type="module">
+    import { initApp } from '../../js/app.js';
+    const staffDashboard = {
+      async init(container) {
+        const { authStore } = await import('../../modules/auth/store.js');
+        const user = authStore.getUser();
+        container.innerHTML = `
+          <div class="page-title"><h1>Staff Dashboard</h1></div>
+          <div class="stats-grid">
+            <div class="card stat-card"><span class="stat-card__label">Welcome</span><span class="stat-card__value">${user?.name || 'Staff'}</span></div>
+            <div class="card stat-card"><span class="stat-card__label">Staff ID</span><span class="stat-card__value" style="font-size:0.875rem">${user?.staffId || '-'}</span></div>
+          </div>
+          <div class="content-grid content-grid--2" style="margin-top:var(--space-4)">
+            <a href="messages.html" class="card" style="text-align:center;padding:var(--space-6)"><h3>Messages</h3><p style="color:var(--color-text-muted)">View chats</p></a>
+            <a href="attendance.html" class="card" style="text-align:center;padding:var(--space-6)"><h3>Attendance</h3><p style="color:var(--color-text-muted)">View attendance</p></a>
+            <a href="salary.html" class="card" style="text-align:center;padding:var(--space-6)"><h3>Salary</h3><p style="color:var(--color-text-muted)">View salary</p></a>
+            <a href="leave.html" class="card" style="text-align:center;padding:var(--space-6)"><h3>Leave</h3><p style="color:var(--color-text-muted)">Request leave</p></a>
+            <a href="announcements.html" class="card" style="text-align:center;padding:var(--space-6);grid-column:1/-1"><h3>Announcements</h3><p style="color:var(--color-text-muted)">View announcements</p></a>
+          </div>
+        `;
+      }
+    };
+    initApp({ roles: ['staff'], title: 'Staff Dashboard', controller: staffDashboard });
+  </script>
+</body>
+</html>

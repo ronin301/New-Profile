@@ -18,7 +18,9 @@ export function renderShopList(shops) {
       { label: 'Mobile', key: 'mobile' },
       { label: 'Status', render: (r) => `<span class="badge badge--${r.active ? 'success' : 'danger'}">${r.active ? 'Active' : 'Inactive'}</span>` },
       { label: 'Created', render: (r) => formatDate(r.createdAt) },
-      { label: 'Actions', render: (r) => `
+      { label: 'Actions', render: (r) => r.isDeleted ? `
+        <button class="btn btn--sm btn--outline restore-shop" data-id="${r.id}">Restore</button>
+      ` : `
         <button class="btn btn--sm btn--outline edit-shop" data-id="${r.id}">Edit</button>
         <button class="btn btn--sm btn--danger delete-shop" data-id="${r.id}">Delete</button>
       ` }

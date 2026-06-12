@@ -1,6 +1,5 @@
 /**
  * Global Event Bus for decoupled module communication.
- * Billing updates do not directly call analytics — they emit events.
  */
 class EventBus {
   constructor() {
@@ -49,6 +48,7 @@ export const EVENTS = {
   SHOP_CREATED: 'shop:created',
   SHOP_UPDATED: 'shop:updated',
   SHOP_DELETED: 'shop:deleted',
+  SHOP_RESTORED: 'shop:restored',
   SALE_CREATED: 'sale:created',
   CUSTOMER_CREATED: 'customer:created',
   CUSTOMER_UPDATED: 'customer:updated',
@@ -58,5 +58,22 @@ export const EVENTS = {
   ANALYTICS_UPDATED: 'analytics:updated',
   SETTINGS_UPDATED: 'settings:updated',
   THEME_CHANGED: 'theme:changed',
-  TOAST: 'ui:toast'
+  TOAST: 'ui:toast',
+  STAFF_CREATED: 'staff:created',
+  STAFF_UPDATED: 'staff:updated',
+  STAFF_REMOVED: 'staff:removed',
+  MANAGER_CREATED: 'manager:created',
+  MANAGER_UPDATED: 'manager:updated',
+  MANAGER_DISABLED: 'manager:disabled',
+  MANAGER_ENABLED: 'manager:enabled',
+  INVENTORY_UPDATED: 'inventory:updated',
+  EXPENSE_CREATED: 'expense:created',
+  EXPENSE_UPDATED: 'expense:updated',
+  CHAT_MESSAGE: 'chat:message',
+  ANNOUNCEMENT_CREATED: 'announcement:created',
+  ATTENDANCE_MARKED: 'attendance:marked',
+  LEAVE_REQUESTED: 'leave:requested',
+  LEAVE_UPDATED: 'leave:updated',
+  PAYROLL_UPDATED: 'payroll:updated',
+  ACTIVITY_LOGGED: 'activity:logged'
 };

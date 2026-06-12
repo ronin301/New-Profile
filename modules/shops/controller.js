@@ -38,6 +38,9 @@ export const shopsController = {
     container.querySelectorAll('.delete-shop').forEach((btn) => {
       btn.addEventListener('click', () => this.deleteShop(btn.dataset.id));
     });
+    container.querySelectorAll('.restore-shop').forEach((btn) => {
+      btn.addEventListener('click', () => this.restoreShop(btn.dataset.id));
+    });
   },
 
   async openShopModal(shopId = null) {
@@ -124,8 +127,8 @@ export const shopsController = {
             shopId: shop.id,
             ownerId: user.uid,
             name: data.managerName,
-            email: data.managerUsername,
-            password: data.managerPassword
+            password: data.managerPassword,
+            shopName: data.name
           });
           showToast(`Shop created! ID: ${shop.shopCode}`, 'success');
         }
@@ -151,6 +154,17 @@ export const shopsController = {
       await this.loadShops(container);
     } catch (err) {
       showToast(err.message || 'Delete failed', 'error');
+    }
+  },
+
+  async restoreShop(shopId) {
+    try {
+      await shopService.restore(shopId);
+      showToast('Shop restored', 'success');
+      const container = document.getElementById('app-content');
+      await this.loadShops(container);
+    } catch (err) {
+      showToast(err.message || 'Restore failed', 'error');
     }
   }
 };

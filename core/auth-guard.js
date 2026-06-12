@@ -24,7 +24,7 @@ export async function initAuthGuard(options = {}) {
       return null;
     }
 
-    if (user.role === 'manager' && user.shopId) {
+    if ((user.role === 'manager' || user.role === 'staff') && user.shopId) {
       const { shopService } = await import('../modules/shops/services.js');
       const shop = await shopService.getById(user.shopId);
       appState.set({ shop });
@@ -47,8 +47,12 @@ export function isManager() {
   return appState.get('user')?.role === 'manager';
 }
 
+export function isStaff() {
+  return appState.get('user')?.role === 'staff';
+}
+
 export function getCurrentShopId() {
   const user = appState.get('user');
-  if (user?.role === 'manager') return user.shopId;
+  if (user?.role === 'manager' || user?.role === 'staff') return user.shopId;
   return appState.get('shop')?.id || null;
 }

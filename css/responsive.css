@@ -1,3 +1,41 @@
+/* ===== Mobile (< 640px) ===== */
+@media (max-width: 639px) {
+  .page-title {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .page-title h1 {
+    font-size: 1.25rem;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .data-table th,
+  .data-table td {
+    padding: var(--space-2);
+    font-size: 0.75rem;
+  }
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .modal {
+    max-width: 100%;
+    margin: var(--space-2);
+    border-radius: var(--radius-md);
+  }
+  .card {
+    padding: var(--space-4);
+  }
+  .content-grid--sidebar {
+    grid-template-columns: 1fr;
+  }
+  .btn--sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+}
+
 /* ===== Tablet (≥ 640px) ===== */
 @media (min-width: 640px) {
   .features-grid {
@@ -10,6 +48,10 @@
 
   .content-grid--2 {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .content-grid--sidebar {
+    grid-template-columns: 280px 1fr;
   }
 }
 

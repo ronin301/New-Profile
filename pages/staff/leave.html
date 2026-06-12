@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Leave — KING BUSINESS ANALYTICS</title>
+  <link rel="stylesheet" href="../../css/main.css" />
+</head>
+<body>
+  <div class="app-shell" id="app-shell"></div>
+  <script type="module">
+    import { initApp } from '../../js/app.js';
+    import { leaveController } from '../../modules/leave/controller.js';
+    initApp({ roles: ['staff'], title: 'Leave', controller: leaveController });
+  </script>
+</body>
+</html>

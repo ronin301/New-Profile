@@ -95,6 +95,18 @@ class ShopService {
     eventBus.emit(EVENTS.SHOP_DELETED, { shopId, shop });
   }
 
+  async restore(shopId) {
+    await updateDoc(doc(db, COLLECTIONS.SHOPS, shopId), {
+      isDeleted: false,
+      active: true,
+      deletedAt: null,
+      updatedAt: serverTimestamp()
+    });
+    const shop = await this.getById(shopId);
+    eventBus.emit(EVENTS.SHOP_RESTORED, shop);
+    return shop;
+  }
+
   async linkManager(shopId, managerId) {
     await updateDoc(doc(db, COLLECTIONS.SHOPS, shopId), {
       managerId,
