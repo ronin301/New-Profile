@@ -14,8 +14,9 @@
     import { authController } from '../../modules/auth/controller.js';
     import { settingsService } from '../../modules/settings/services.js';
     settingsService.loadTheme();
-    const isManager = new URLSearchParams(location.search).get('role') === 'manager';
-    authController.initLogin(document.getElementById('auth-container'), isManager);
+    const params = new URLSearchParams(location.search);
+    const role = params.get('role') || 'owner';
+    authController.initLogin(document.getElementById('auth-container'), role);
   </script>
 </body>
 </html>

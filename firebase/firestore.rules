@@ -18,6 +18,10 @@ service cloud.firestore {
       return isAuthenticated() && getUserData().role == 'manager';
     }
 
+    function isStaff() {
+      return isAuthenticated() && getUserData().role == 'staff';
+    }
+
     function ownsShop(shopId) {
       return isOwner() && get(/databases/$(database)/documents/shops/$(shopId)).data.ownerId == request.auth.uid;
     }
@@ -26,15 +30,14 @@ service cloud.firestore {
       return isManager() && getUserData().shopId == shopId;
     }
 
+    function staffOfShop(shopId) {
+      return isStaff() && getUserData().shopId == shopId;
+    }
+
     function canAccessShop(shopId) {
       return ownsShop(shopId) || managesShop(shopId);
     }
 
-    // Query-friendly access checks for list/collection reads. Firestore cannot
-    // evaluate get()-based rules (ownsShop) against a query, so owner-wide list
-    // queries must authorize off a field stored on each document (ownerId).
-    // Every owned record stores `ownerId`; shop-scoped records also store
-    // `shopId`, which a manager's own profile is matched against.
     function ownsRecord() {
       return isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
@@ -43,23 +46,31 @@ service cloud.firestore {
       return isManager() && getUserData().shopId == resource.data.shopId;
     }
 
+    function staffRecord() {
+      return isStaff() && getUserData().shopId == resource.data.shopId;
+    }
+
+    // Users
     match /users/{userId} {
       allow read: if isAuthenticated() && (request.auth.uid == userId || isOwner());
       allow create: if isAuthenticated() && request.auth.uid == userId;
-      allow update: if isAuthenticated() && request.auth.uid == userId;
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isOwner());
       allow delete: if isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Shops
     match /shops/{shopId} {
       allow read: if isAuthenticated() && (
         resource.data.ownerId == request.auth.uid ||
-        (isManager() && getUserData().shopId == shopId)
+        (isManager() && getUserData().shopId == shopId) ||
+        (isStaff() && getUserData().shopId == shopId)
       );
       allow create: if isOwner() && request.resource.data.ownerId == request.auth.uid;
       allow update: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Managers
     match /managers/{managerId} {
       allow read: if isAuthenticated() && (
         resource.data.ownerId == request.auth.uid || request.auth.uid == resource.data.authUid
@@ -69,6 +80,18 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Staff
+    match /staff/{staffId} {
+      allow read: if isAuthenticated() && (
+        ownsRecord() || managesRecord() ||
+        (isStaff() && resource.data.authUid == request.auth.uid)
+      );
+      allow create: if isAuthenticated() && (isOwner() || isManager());
+      allow update: if isAuthenticated() && (ownsRecord() || managesRecord());
+      allow delete: if isAuthenticated() && ownsRecord();
+    }
+
+    // Sales
     match /sales/{saleId} {
       allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
       allow create: if isAuthenticated() && canAccessShop(request.resource.data.shopId);
@@ -76,6 +99,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Customers
     match /customers/{customerId} {
       allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
       allow create: if isAuthenticated() && canAccessShop(request.resource.data.shopId);
@@ -83,6 +107,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Products
     match /products/{productId} {
       allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
       allow create: if isAuthenticated() && canAccessShop(request.resource.data.shopId);
@@ -90,6 +115,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Invoices
     match /invoices/{invoiceId} {
       allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
       allow create: if isAuthenticated() && canAccessShop(request.resource.data.shopId);
@@ -97,6 +123,7 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Udhari
     match /udhari/{udhariId} {
       allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
       allow create: if isAuthenticated() && canAccessShop(request.resource.data.shopId);
@@ -104,15 +131,83 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && resource.data.ownerId == request.auth.uid;
     }
 
+    // Inventory
+    match /inventory/{itemId} {
+      allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
+      allow create: if isAuthenticated() && (isOwner() || isManager());
+      allow update: if isAuthenticated() && (ownsRecord() || managesRecord());
+      allow delete: if isAuthenticated() && ownsRecord();
+    }
+
+    // Expenses
+    match /expenses/{expenseId} {
+      allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
+      allow create: if isAuthenticated() && (isOwner() || isManager());
+      allow update: if isAuthenticated() && (ownsRecord() || managesRecord());
+      allow delete: if isAuthenticated() && ownsRecord();
+    }
+
+    // Chats
+    match /chats/{chatId} {
+      allow read, write: if isAuthenticated();
+      match /messages/{messageId} {
+        allow read, write: if isAuthenticated();
+      }
+    }
+
+    // Announcements
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && (isOwner() || isManager());
+      allow update: if isAuthenticated() && (isOwner() || isManager());
+      allow delete: if isAuthenticated() && isOwner();
+    }
+
+    // Attendance
+    match /attendance/{recordId} {
+      allow read: if isAuthenticated() && (
+        ownsRecord() || managesRecord() || staffRecord()
+      );
+      allow create: if isAuthenticated() && (isOwner() || isManager());
+      allow update: if isAuthenticated() && (isOwner() || isManager());
+    }
+
+    // Payroll
+    match /payroll/{payrollId} {
+      allow read: if isAuthenticated() && (
+        ownsRecord() || managesRecord() || staffRecord()
+      );
+      allow write: if isAuthenticated() && (isOwner() || isManager());
+    }
+
+    // Leave Requests
+    match /leaveRequests/{leaveId} {
+      allow read: if isAuthenticated() && (
+        ownsRecord() || managesRecord() ||
+        resource.data.staffUid == request.auth.uid
+      );
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated() && (isOwner() || isManager() || resource.data.staffUid == request.auth.uid);
+    }
+
+    // Activity Log
+    match /activityLog/{logId} {
+      allow read: if isAuthenticated() && ownsRecord();
+      allow create: if isAuthenticated();
+    }
+
+    // Analytics
     match /analytics/{docId} {
       allow read: if isAuthenticated() && (ownsRecord() || managesRecord());
       allow write: if isAuthenticated() && canAccessShop(request.resource.data.shopId);
     }
 
+    // Settings
     match /settings/{ownerId} {
       allow read, write: if isAuthenticated() && request.auth.uid == ownerId;
     }
 
+    // Backup
     match /backup/{backupId} {
       allow read, write: if isOwner() && resource.data.ownerId == request.auth.uid;
       allow create: if isOwner() && request.resource.data.ownerId == request.auth.uid;

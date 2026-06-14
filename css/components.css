@@ -359,3 +359,45 @@
   height: 300px;
   width: 100%;
 }
+
+/* Modal backdrop (used by inline modals) */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.5);
+  z-index: calc(var(--z-modal) - 1);
+  display: none;
+}
+.modal-backdrop.is-visible { display: block; }
+
+.modal.is-visible {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-modal);
+  display: block;
+}
+
+/* Table responsive wrapper */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Content grid */
+.content-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* Chat contact hover */
+.chat-contact:hover {
+  background: var(--color-bg-muted);
+}
+
+/* Badge default */
+.badge--default {
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+}

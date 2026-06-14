@@ -12,14 +12,21 @@ import {
 import { app, auth, db } from '../../firebase/init.js';
 import { COLLECTIONS } from '../../database/collections.js';
 import { shopService } from '../shops/services.js';
+import { eventBus, EVENTS } from '../../core/event-bus.js';
+
+function generateManagerId(name, shopName) {
+  const cleanName = (name || 'Manager').replace(/\s+/g, '');
+  const cleanShop = (shopName || 'Shop').replace(/\s+/g, '');
+  const code = String(Math.floor(Math.random() * 99999) + 1).padStart(5, '0');
+  return `${cleanName}_${cleanShop}_${code}`;
+}
+
+function generateManagerEmail(managerId) {
+  return `${managerId.toLowerCase().replace(/[^a-z0-9]/g, '')}@kba-manager.internal`;
+}
 
 class ManagerService {
   async createManagerAuth(email, password, profile = null) {
-    // Create the manager's Auth account on a secondary app so the owner's own
-    // session is never disturbed. The manager's users/{uid} profile is written
-    // through this same secondary (manager-authenticated) connection so the
-    // write satisfies the `request.auth.uid == userId` self-create rule — an
-    // owner is not permitted to create another account's profile document.
     const secondaryApp = initializeApp(app.options, `Secondary_${Date.now()}`);
     const secondaryAuth = getAuth(secondaryApp);
     try {
@@ -32,9 +39,11 @@ class ManagerService {
           role: 'manager',
           name: profile.name,
           email,
+          managerId: profile.managerId,
           mobile: profile.mobile || '',
           shopId: profile.shopId,
           ownerId: profile.ownerId,
+          disabled: false,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
@@ -46,10 +55,13 @@ class ManagerService {
     }
   }
 
-  async create({ shopId, ownerId, name, email, password }) {
-    // Auth account + the manager's own users/{uid} profile are provisioned
-    // together through the secondary manager-authenticated connection.
-    const authUid = await this.createManagerAuth(email, password, { name, shopId, ownerId });
+  async create({ shopId, ownerId, name, password, shopName }) {
+    const managerId = generateManagerId(name, shopName);
+    const email = generateManagerEmail(managerId);
+
+    const authUid = await this.createManagerAuth(email, password, {
+      name, shopId, ownerId, managerId, mobile: ''
+    });
 
     const managerRef = doc(collection(db, COLLECTIONS.MANAGERS));
     const manager = {
@@ -57,21 +69,21 @@ class ManagerService {
       shopId,
       ownerId,
       authUid,
+      managerId,
       name,
       email,
+      disabled: false,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
     await setDoc(managerRef, manager);
     await shopService.linkManager(shopId, managerRef.id);
-    return manager;
+    eventBus.emit(EVENTS.MANAGER_CREATED, manager);
+    return { ...manager, password };
   }
 
   async getByShop(shopId, ownerId = null) {
-    // Owner-side reads must be scoped by ownerId so the query matches the
-    // security rule (which authorizes manager reads off `ownerId`). Without
-    // the ownerId filter Firestore rejects the list query.
     const clauses = [where('shopId', '==', shopId)];
     if (ownerId) clauses.push(where('ownerId', '==', ownerId));
     const q = query(collection(db, COLLECTIONS.MANAGERS), ...clauses);
@@ -79,13 +91,73 @@ class ManagerService {
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
   }
 
+  async getByOwner(ownerId) {
+    const q = query(collection(db, COLLECTIONS.MANAGERS), where('ownerId', '==', ownerId));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+
+  async getById(managerId) {
+    const snap = await getDoc(doc(db, COLLECTIONS.MANAGERS, managerId));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() };
+  }
+
+  async update(id, data) {
+    await updateDoc(doc(db, COLLECTIONS.MANAGERS, id), {
+      ...data,
+      updatedAt: serverTimestamp()
+    });
+    const manager = await this.getById(id);
+    eventBus.emit(EVENTS.MANAGER_UPDATED, manager);
+    return manager;
+  }
+
+  async disable(id) {
+    const manager = await this.getById(id);
+    await this.update(id, { disabled: true });
+    if (manager?.authUid) {
+      try {
+        await updateDoc(doc(db, COLLECTIONS.USERS, manager.authUid), {
+          disabled: true,
+          updatedAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.warn('[Managers] user disable skipped:', err?.message);
+      }
+    }
+    eventBus.emit(EVENTS.MANAGER_DISABLED, manager);
+  }
+
+  async enable(id) {
+    const manager = await this.getById(id);
+    await this.update(id, { disabled: false });
+    if (manager?.authUid) {
+      try {
+        await updateDoc(doc(db, COLLECTIONS.USERS, manager.authUid), {
+          disabled: false,
+          updatedAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.warn('[Managers] user enable skipped:', err?.message);
+      }
+    }
+    eventBus.emit(EVENTS.MANAGER_ENABLED, manager);
+  }
+
+  async updateManagerPassword(managerId) {
+    const manager = await this.getById(managerId);
+    if (!manager?.email) throw new Error('Manager not found or email missing');
+    await sendPasswordResetEmail(auth, manager.email);
+    await this.update(managerId, { passwordResetSentAt: serverTimestamp() });
+  }
+
   async updateForShop(shopId, ownerId, { name, email, password }) {
     const managers = await this.getByShop(shopId, ownerId);
     if (!managers.length) {
-      if (!password) {
-        throw new Error('A password is required to create the manager account.');
-      }
-      return this.create({ shopId, ownerId, name, email, password });
+      if (!password) throw new Error('A password is required to create the manager account.');
+      const shop = await shopService.getById(shopId);
+      return this.create({ shopId, ownerId, name, password, shopName: shop?.name || 'Shop' });
     }
 
     const manager = managers[0];
@@ -94,10 +166,6 @@ class ManagerService {
 
     await updateDoc(doc(db, COLLECTIONS.MANAGERS, manager.id), updates);
 
-    // The manager's users/{uid} profile can only be written by the manager
-    // themselves (self-write rule). Syncing the display name/email from the
-    // owner side is best-effort: the managers doc above is the source of truth
-    // for the owner UI, so an owner edit must never fail if this sync is denied.
     if (manager.authUid) {
       try {
         await updateDoc(doc(db, COLLECTIONS.USERS, manager.authUid), {
@@ -109,42 +177,6 @@ class ManagerService {
         console.warn('[KBA][managers] manager profile name sync skipped:', err?.code || err?.message || err);
       }
     }
-  }
-
-  async getById(managerId) {
-    const snap = await getDoc(doc(db, COLLECTIONS.MANAGERS, managerId));
-    if (!snap.exists()) return null;
-    return { id: snap.id, ...snap.data() };
-  }
-
-  /**
-   * Reset a manager's password (audit fix — this system was missing).
-   *
-   * A web client cannot directly set another user's password (that needs the
-   * Firebase Admin SDK / a Cloud Function). The production-safe client path is
-   * to email the manager a password-reset link. We stamp the manager doc so the
-   * owner has an audit trail of the request.
-   */
-  async updateManagerPassword(managerId) {
-    const manager = await this.getById(managerId);
-    if (!manager) throw new Error('Manager not found.');
-    if (!manager.email) throw new Error('Manager has no email on file.');
-
-    await sendPasswordResetEmail(auth, manager.email);
-    await updateDoc(doc(db, COLLECTIONS.MANAGERS, managerId), {
-      passwordResetRequestedAt: serverTimestamp(),
-      updatedAt: serverTimestamp()
-    });
-    return { email: manager.email, method: 'reset-email' };
-  }
-
-  /** Enable/disable a manager at the application level. */
-  async setDisabled(managerId, disabled = true) {
-    await updateDoc(doc(db, COLLECTIONS.MANAGERS, managerId), {
-      disabled: !!disabled,
-      updatedAt: serverTimestamp()
-    });
-    return true;
   }
 }
 

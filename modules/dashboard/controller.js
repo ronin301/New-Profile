@@ -8,6 +8,8 @@ import { formatCurrency, formatDateTime } from '../../utils/formatters.js';
 import { escapeHtml } from '../../utils/helpers.js';
 import { toISODate } from '../../utils/formatters.js';
 import { getDateRange } from '../../utils/date-utils.js';
+import { managerService } from '../managers/services.js';
+import { staffService } from '../staff/services.js';
 
 export const dashboardController = {
   async initAdmin(container) {
@@ -39,16 +41,36 @@ export const dashboardController = {
       console.warn('[KBA][dashboard] live totals fallback:', err?.message || err);
     }
 
+    let totalManagers = 0, totalStaff = 0;
+    try {
+      const managers = await managerService.getByOwner(user.uid);
+      totalManagers = managers.length;
+      const staff = await staffService.getByOwner(user.uid);
+      totalStaff = staff.length;
+    } catch (err) {
+      console.warn('[KBA][dashboard] manager/staff count failed:', err?.message);
+    }
+
     container.innerHTML = `
       <div class="page-title"><h1>Owner Dashboard</h1><p>Overview of all your shops</p></div>
       ${renderStatsCards(stats)}
-      <div class="card" style="margin-top: var(--space-6)">
+      <div class="stats-grid" style="margin-top: var(--space-4)">
+        <div class="card stat-card"><span class="stat-card__label">Managers</span><span class="stat-card__value">${totalManagers}</span></div>
+        <div class="card stat-card"><span class="stat-card__label">Staff</span><span class="stat-card__value">${totalStaff}</span></div>
+      </div>
+      <div class="card" style="margin-top: var(--space-4)">
         <div class="card__header">
           <h3 class="card__title">Quick Actions</h3>
         </div>
         <div style="display:flex; flex-wrap:wrap; gap:var(--space-3)">
           <a href="shops.html" class="btn btn--primary">Manage Shops</a>
-          <a href="analytics.html" class="btn btn--outline">View Analytics</a>
+          <a href="managers.html" class="btn btn--outline">Managers</a>
+          <a href="staff.html" class="btn btn--outline">Staff</a>
+          <a href="inventory.html" class="btn btn--outline">Inventory</a>
+          <a href="expenses.html" class="btn btn--outline">Expenses</a>
+          <a href="analytics.html" class="btn btn--outline">Analytics</a>
+          <a href="chat.html" class="btn btn--outline">Chat</a>
+          <a href="announcements.html" class="btn btn--outline">Announcements</a>
           <a href="backup.html" class="btn btn--outline">Backup Data</a>
         </div>
       </div>
